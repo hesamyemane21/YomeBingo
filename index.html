@@ -4,30 +4,32 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Yem Bingo - Ethiopia's #1 Live Multiplayer Bingo</title>
+  
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
-        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
     
-   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<style>
-  :root {
-    --bg-dark: #06191E;
-    --bg-surface: #0A2229;
-    --bg-card: #0F2D36;
-    --border-color: #1A4755;
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-    --gold-primary: #FFC107;
-    --gold-light: #FFE082;
-    --gold-dark: #FFA000;
+  <style>
+    :root {
+      --bg-dark: #06191E;
+      --bg-surface: #0A2229;
+      --bg-card: #0F2D36;
+      --bg-card-elevated: #133844;
+      --border-color: #1A4755;
 
-    --mint-primary: #20C997;
-    --mint-light: #6EE7B7;
-    --mint-dark: #0E9F6E;
+      --gold-primary: #FFC107;
+      --gold-light: #FFE082;
+      --gold-dark: #FFA000;
 
-    --orange-dynamic: #FF5722;
-    --orange-light: #FF8A65;
-    --orange-dark: #E64A19;
+      --mint-primary: #20C997;
+      --mint-light: #6EE7B7;
+      --mint-dark: #0E9F6E;
+
+      --orange-dynamic: #FF5722;
+      --orange-light: #FF8A65;
+      --orange-dark: #E64A19;
       
       --text-primary: #FFFFFF;
       --text-secondary: #94A3B8;
@@ -186,7 +188,7 @@
 
     .progress-bar-fill {
       height: 100%;
-      width: 86.4%; /* 432 / 500 */
+      width: 86.4%;
       background: linear-gradient(90deg, var(--gold-dark), var(--orange-dynamic));
       border-radius: 4px;
       transition: width 0.5s ease;
@@ -966,6 +968,15 @@
 </div>
 
 <script>
+  // Initialize Telegram SDK safely
+  if (window.Telegram && window.Telegram.WebApp) {
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+    tg.setHeaderColor('#06191E');
+    tg.setBackgroundColor('#06191E');
+  }
+
   // State Management
   let balance = 250;
   let selectedTicketNum = 77;
@@ -1232,16 +1243,20 @@
     document.getElementById('modal-title').innerText = 'Top Up Wallet';
     document.getElementById('wallet-modal').classList.add('open');
   }
+
   function openWithdrawModal() {
     document.getElementById('modal-title').innerText = 'Instant Cashout';
     document.getElementById('wallet-modal').classList.add('open');
   }
+
   function closeModal() {
     document.getElementById('wallet-modal').classList.remove('open');
   }
+
   function setDepositAmount(val) {
     document.getElementById('deposit-input').value = val;
   }
+
   function confirmDeposit() {
     const val = parseInt(document.getElementById('deposit-input').value) || 0;
     balance += val;
@@ -1249,6 +1264,7 @@
     closeModal();
     alert(`Successfully credited +${val} ETB to your account!`);
   }
+
   function claimDailyReward() {
     balance += 50;
     updateBalanceDisplay();
@@ -1262,23 +1278,12 @@
 
   function startCountdownTimer() {
     let s = 48;
-        setInterval(() => {
+    setInterval(() => {
       s = s <= 0 ? 59 : s - 1;
       const el = document.getElementById('sec-timer');
       if (el) el.innerText = `${s < 10 ? '0' : ''}${s}s`;
     }, 1000);
-  </script>
-
-  <!-- TELEGRAM INTEGRATION SCRIPT -->
-  <script>
-    // Initialize Telegram SDK
-    const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
-
-    // Set Telegram top header bar to match your dark teal UI color
-    tg.setHeaderColor('#06191E');
-    tg.setBackgroundColor('#06191E');
-  </script>
+  }
+</script>
 </body>
 </html>
