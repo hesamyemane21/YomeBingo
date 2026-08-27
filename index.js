@@ -1,6 +1,6 @@
 const { Telegraf, Markup } = require('telegraf');
 
-const bot = new Telegraf('YOUR_BOT_TOKEN_HERE');
+const bot = new Telegraf('8744590697:AAGfNdEv1_ZI6rvMx5KNfWmcLf29OQU80Ac');
 
 bot.command('start', async (ctx) => {
   const photoUrl = 'https://hesamyemane21.github.io/YemeBingo/banner.jpg';
