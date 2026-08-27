@@ -1,10 +1,21 @@
 const { Telegraf, Markup } = require('telegraf');
+const http = require('http');
 
-const bot = new Telegraf('8744590697:AAGfNdEv1_ZI6rvMx5KNfWmcLf29OQU80Ac');
+// Simple HTTP server to satisfy Render's port check
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('YemeBingo Bot is running live!\n');
+}).listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
+});
+
+// Telegram Bot Logic
+const bot = new Telegraf('8744590697:AAGfNdEv1_ZI6rvMx5KNfWmcLf29OQU8OAc');
 
 bot.command('start', async (ctx) => {
   const photoUrl = 'https://hesamyemane21.github.io/YemeBingo/banner.jpg';
-
+  
   await ctx.replyWithPhoto(photoUrl, {
     caption: 'Welcome to Yeme Bingo! Play bingo and start winning today!',
     ...Markup.inlineKeyboard([
