@@ -3,6 +3,7 @@ const http = require('http');
 
 const PORT = process.env.PORT || 3000;
 
+// Keep-alive HTTP server for Render
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('YemeBingo Bot is live!\n');
@@ -14,6 +15,13 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 
 // In-memory store for user deposit amounts
 const userDeposits = {};
+
+// --- DEPOSIT TRIGGER ---
+const startDepositFlow = async (ctx) => {
+  await ctx.reply('Please enter the amount you want to deposit (50–3000 ETB):', {
+    reply_markup: { force_reply: true }
+  });
+};
 
 // --- START COMMAND ---
 bot.command('start', async (ctx) => {
@@ -39,13 +47,6 @@ bot.command('start', async (ctx) => {
   }
 });
 
-// --- DEPOSIT TRIGGER ---
-const startDepositFlow = async (ctx) => {
-  await ctx.reply('Please enter the amount you want to deposit (50–3000 ETB):', {
-    reply_markup: { force_reply: true }
-  });
-};
-
 bot.action('deposit', async (ctx) => {
   await ctx.answerCbQuery();
   await startDepositFlow(ctx);
@@ -57,6 +58,8 @@ bot.command('deposit', async (ctx) => {
 
 // --- HANDLE TEXT RESPONSES (AMOUNT INPUT) ---
 bot.on('text', async (ctx, next) => {
+  if (!ctx.message || !ctx.message.text) return next();
+  
   const text = ctx.message.text.trim();
   
   // Skip if it's a command like /start
@@ -68,14 +71,13 @@ bot.on('text', async (ctx, next) => {
     const formattedAmount = amount.toFixed(1);
     userDeposits[ctx.from.id] = formattedAmount;
 
-        return ctx.reply(
+    return ctx.reply(
       `To deposit ${formattedAmount} ETB, select the wallet you are sending from:`,
       Markup.inlineKeyboard([
         [Markup.button.callback('TeleBirr', `pay_telebirr_${ctx.from.id}`)],
         [Markup.button.callback('CBE Birr', `pay_cbe_${ctx.from.id}`)]
       ])
     );
-
   } else {
     return ctx.reply('⚠️ Invalid amount. Please enter a number between 50 and 3000 ETB:');
   }
