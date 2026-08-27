@@ -11,7 +11,7 @@ http.createServer((req, res) => {
 });
 
 // Telegram Bot Logic
-const bot = new Telegraf('8744590697:AAGfNdEv1_ZI6rvMx5KNfWmcLf29OQU8OAc');
+const bot = new Telegraf('8744590697:AAFOLkcvHnIKcv0EMIiicBUzB8x_vmzdHzU');
 
 bot.command('start', async (ctx) => {
   const photoUrl = 'https://hesamyemane21.github.io/YemeBingo/banner.jpg';
