@@ -68,13 +68,14 @@ bot.on('text', async (ctx, next) => {
     const formattedAmount = amount.toFixed(1);
     userDeposits[ctx.from.id] = formattedAmount;
 
-    return ctx.reply(
+        return ctx.reply(
       `To deposit ${formattedAmount} ETB, select the wallet you are sending from:`,
       Markup.inlineKeyboard([
         [Markup.button.callback('TeleBirr', `pay_telebirr_${ctx.from.id}`)],
         [Markup.button.callback('CBE Birr', `pay_cbe_${ctx.from.id}`)]
       ])
     );
+
   } else {
     return ctx.reply('⚠️ Invalid amount. Please enter a number between 50 and 3000 ETB:');
   }
