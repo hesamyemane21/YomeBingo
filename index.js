@@ -10,7 +10,7 @@ http.createServer((req, res) => {
   console.log(`Server listening on port ${PORT}`);
 });
 
-const bot = new Telegraf('8744590697:AAF0LkcvHNirCv0EMIicBuzBBX_vmzdHzU');
+const bot = new Telegraf('8744590697:AAFOLkcvHnIKcv0EMIiicBUzB8x_vmzdHzU');
 
 bot.command('start', async (ctx) => {
   const textMsg = 'Welcome to Yeme Bingo! Play bingo and start winning today!';
