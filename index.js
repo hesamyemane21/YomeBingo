@@ -10,10 +10,12 @@ http.createServer((req, res) => {
   console.log(`Server listening on port ${PORT}`);
 });
 
-const bot = new Telegraf('8744590697:AAFOLkcvHnIKcv0EMIiicBUzB8x_vmzdHzU');
+const bot = new Telegraf('8744590697:AAF0LkcvHNirCv0EMIicBuzBBX_vmzdHzU');
 
 bot.command('start', async (ctx) => {
   const textMsg = 'Welcome to Yeme Bingo! Play bingo and start winning today!';
+  const photoUrl = 'https://hesamyemane21.github.io/YemeBingo/banner.jpg';
+  
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.webApp('🎮 Play now 🎮', 'https://hesamyemane21.github.io/YemeBingo/')],
     [
@@ -27,13 +29,16 @@ bot.command('start', async (ctx) => {
   ]);
 
   try {
-    const photoUrl = 'https://hesamyemane21.github.io/YemeBingo/banner.jpg';
-    await ctx.replyWithPhoto(photoUrl, { caption: textMsg, ...keyboard });
+    await ctx.replyWithPhoto(photoUrl, {
+      caption: textMsg,
+      reply_markup: keyboard.reply_markup
+    });
   } catch (err) {
     console.error('Photo failed to send, falling back to text:', err);
     await ctx.reply(textMsg, keyboard);
   }
 });
+
 
 bot.action('deposit', (ctx) => ctx.reply('Please enter the amount you want to deposit (50–3000 ETB):'));
 bot.action('balance', (ctx) => ctx.reply('Your balance: 0.00 ETB'));
