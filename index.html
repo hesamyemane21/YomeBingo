@@ -892,16 +892,17 @@ const firebaseConfig = {
   let selectedTicketNum = null, activeRoomSeed = null, currentCard = [], calledNumbers = [];
 
   window.enterTicketSelection = function(roomId) {
-    activeRoomSeed = ROOM_SEED.find(r => r.id === roomId);
-    currentRoomId = roomId;
-    selectedTicketNum = 1 + Math.floor(Math.random() * 25);
-    document.getElementById('selected-room-title').innerText = `${activeRoomSeed.name} (${activeRoomSeed.stake} ETB)`;
-    document.getElementById('ticket-number-label').innerText = selectedTicketNum;
-    document.getElementById('lobby-section').style.display = 'none';
-    document.getElementById('ticket-section').style.display = 'block';
-    initTicketChips();
-    generateRandomCard();
-  };
+  activeRoomSeed = ROOM_SEED.find(r => r.id === roomId);
+  currentRoomId = roomId;
+  // Increase max random ticket selection to 500
+  selectedTicketNum = 1 + Math.floor(Math.random() * 500); 
+  document.getElementById('selected-room-title').innerText = `${activeRoomSeed.name} (${activeRoomSeed.stake} ETB)`;
+  document.getElementById('ticket-number-label').innerText = selectedTicketNum;
+  document.getElementById('lobby-section').style.display = 'none';
+  document.getElementById('ticket-section').style.display = 'block';
+  initTicketChips();
+  generateRandomCard();
+};
 
   window.backToLobby = function() {
     document.getElementById('ticket-section').style.display = 'none';
@@ -909,16 +910,24 @@ const firebaseConfig = {
   };
 
   function initTicketChips() {
-    const container = document.getElementById('ticket-chips-container');
-    container.innerHTML = '';
-    for (let i = 1; i <= 25; i++) {
-      const chip = document.createElement('div');
-      chip.className = `ticket-chip ${i === selectedTicketNum ? 'selected' : ''}`;
-      chip.innerText = `#${i}`;
-      chip.onclick = () => { selectedTicketNum = i; document.getElementById('ticket-number-label').innerText = i; initTicketChips(); };
-      container.appendChild(chip);
-    }
+  const container = document.getElementById('ticket-chips-container');
+  container.innerHTML = '';
+  // Expand loop limit to 500
+  for (let i = 1; i <= 500; i++) { 
+    const chip = document.createElement('div');
+    chip.className = `ticket-chip ${i === selectedTicketNum ? 'selected' : ''}`;
+    chip.innerText = `#${i}`;
+    chip.onclick = () => { 
+      selectedTicketNum = i; 
+      document.getElementById('ticket-number-label').innerText = i; 
+      initTicketChips(); 
+      // Force the card to regenerate when a new ticket is tapped
+      generateRandomCard(); 
+    };
+    container.appendChild(chip);
   }
+}
+
 
   window.generateRandomCard = function() {
     currentCard = [];
