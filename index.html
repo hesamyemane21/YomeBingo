@@ -678,27 +678,56 @@ const firebaseConfig = {
     setConnStatus(false, "Connecting to Firebase…");
     attemptSignIn();
 
-    // Extract Telegram user info
+// Extract Telegram user info
 const tg = window.Telegram?.WebApp;
 const tgUser = tg?.initDataUnsafe?.user;
+const telegramId = tgUser?.id; // Unique Telegram ID (e.g., 7309584664)
 
 onAuthStateChanged(auth, async (user) => {
   if (user) {
-    uid = user.uid;
-    
-    // Fallback to Telegram profile name or default ID
-    const displayName = tgUser 
-      ? `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() || tgUser.username 
-      : `Player-${uid.slice(0,4)}`;
-      
-    const telegramId = tgUser?.id ? String(tgUser.id) : null;
-    const profilePic = tgUser?.photo_url || null;
+    // Primary key: Telegram ID if available, otherwise fallback to Firebase UID
+    const docId = telegramId ? String(telegramId) : user.uid;
 
-    setConnStatus(true, `Connected • ${displayName}`);
+    const displayName = tgUser
+      ? `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() || tgUser.username
+      : `Player-${docId.slice(0, 4)}`;
+
+    const userRef = doc(db, "users", docId);
     
-    // Save to Firestore & initialize data feeds
-    await ensureUserDoc(uid, { displayName, telegramId, profilePic });
-    listenToUserDoc(uid);
+    // Set up real-time listener so the UI updates instantly on balance changes
+    onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        // Update your UI element with the live database balance
+        document.getElementById("user-balance").innerText = `${data.balance.toFixed(2)} ETB`;
+      } else {
+        // Create initial user record if new
+        setDoc(userRef, {
+          telegramId: telegramId || null,
+          displayName: displayName,
+          balance: 0.00,
+          createdAt: new Date()
+        });
+      }
+    });
+  }
+});
+
+    const telegramId = tgUser?.id ? String(tgUser.id) : null;
+const profilePic = tgUser?.photo_url || null;
+
+// Paste userDocId variable definition here:
+const userDocId = telegramId || uid;
+
+setConnStatus(true, `Connected • ${displayName}`);
+
+// Save to Firestore & initialize data feeds
+await ensureUserDoc(userDocId, {
+  displayName,
+  telegramId,
+  profilePic
+});
+listenToUserDoc(userDocId);
     listenToLeaderboard();
     listenToRooms();
     
@@ -1022,14 +1051,6 @@ onAuthStateChanged(auth, async (user) => {
          since startedAt. No single client needs to stay the host. ---- */
   const CALL_INTERVAL_MS = 2400;
   let clockInterval = null;
-  // FIX: this was previously used below (in startLiveGame / callNextBall /
-  // leaveGame / checkForWin) without ever being declared, which threw a
-  // ReferenceError the instant "Start Game" was tapped — silently aborting
-  // the function before it could switch views. Declaring it here fixes that.
-  let gameInterval = null;
-  // FIX: same issue — callNextBall() reads `autoDaub` but nothing ever
-  // declared or set it, so auto-marking/win-checking would throw too.
-  let autoDaub = true;
 
   window.startLiveGame = async function() {
     if (!isConfigured || !uid) { alert('Firebase not connected yet.'); return; }
@@ -1046,24 +1067,13 @@ onAuthStateChanged(auth, async (user) => {
     await addDoc(collection(db, "rooms", currentRoomId, "tickets"), {
       uid, ticketNum: selectedTicketNum, card: currentCard, joinedAt: serverTimestamp()
     });
-
-    calledNumbers = [];
+calledNumbers = [];
     init100Matrix();
     renderBingoGrid('active-bingo-grid', true);
 
-    // FIX: actually switch from the ticket-selection screen to the live
-    // gameplay screen — this was previously missing entirely, so even
-    // once the ReferenceError above is fixed, the game would still "run"
-    // invisibly behind the ticket-selection view.
-    document.getElementById('ticket-section').style.display = 'none';
-    document.getElementById('gameplay-section').style.display = 'block';
-    document.getElementById('caller-status-text').innerText = 'CALLING BALLS…';
-    document.getElementById('called-count').innerText = '0';
-    document.getElementById('caller-ball').innerText = '--';
-
     // Start live ball caller loop (1 ball every 2.4 seconds)
     if (gameInterval) clearInterval(gameInterval);
-    gameInterval = setInterval(callNextBall, CALL_INTERVAL_MS);
+    gameInterval = setInterval(callNextBall, 2400);
   }
 
   function callNextBall() {
@@ -1116,9 +1126,9 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   window.toggleAutoDaub = function() {
-    autoDaub = !autoDaub;
     const btn = document.getElementById('autodaub-btn');
-    btn.innerText = `Auto-Daub: ${autoDaub ? 'ON' : 'OFF'}`;
+    const on = btn.innerText.includes('ON');
+    btn.innerText = `Auto-Daub: ${on ? 'OFF' : 'ON'}`;
   };
 
   
@@ -1150,10 +1160,7 @@ onAuthStateChanged(auth, async (user) => {
     }
 
     if (winFound) {
-      // FIX: this was clearing clockInterval (which is never started
-      // anywhere) instead of gameInterval (the timer that's actually
-      // calling balls) — so the caller kept running after a win.
-      if (gameInterval) clearInterval(gameInterval);
+      if (clockInterval) clearInterval(clockInterval);
       renderBingoGrid('active-bingo-grid', true);
       triggerWinCelebration();
     }
@@ -1179,9 +1186,7 @@ onAuthStateChanged(auth, async (user) => {
   };
 
   window.leaveGame = async function() {
-    // FIX: was clearing clockInterval (never used) instead of the actual
-    // running gameInterval, so the ball caller kept firing after exiting.
-    if (gameInterval) clearInterval(gameInterval);
+    if (clockInterval) clearInterval(clockInterval);
     if (gameDocUnsub) gameDocUnsub();
     if (currentRoomId) {
       try { await updateDoc(doc(db, "rooms", currentRoomId), { playerCount: increment(-1) }); } catch(e) {}
