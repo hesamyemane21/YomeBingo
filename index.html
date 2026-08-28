@@ -355,7 +355,8 @@
         </div>
       </div>
       <div class="wallet-chip" onclick="openDepositModal()">
-        <span><span id="wallet-balance">0</span> ETB<span class="demo-badge">Demo</span></span>
+        <span><span id="wallet-balance"></span>
+        </span>
         <div class="plus-btn">+</div>
       </div>
     </div>
@@ -492,13 +493,10 @@
 
       <div style="margin-top: 14px; background: var(--bg-dark); border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
         <div>
-          <div style="font-size: 10px; color: var(--text-secondary); font-weight: bold;">CURRENT BALANCE <span class="demo-badge">Demo</span></div>
-          <div style="font-size: 20px; font-weight: 900; color: var(--gold-primary);"><span id="profile-balance">0</span> ETB</div>
+          <div style="font-size: 10px; color: var(--text-secondary); font-weight: bold;">CURRENT BALANCE </div>
+          <div style="font-size: 20px; font-weight: 900; color: var(--gold-primary);"><span id="profile-balance">0</span></div>
         </div>
-        <div style="display: flex; gap: 8px;">
-          <button onclick="openDepositModal()" class="btn-orange">Deposit</button>
-          <button onclick="openWithdrawModal()" style="background: transparent; border: 1px solid var(--mint-primary); color: var(--mint-primary); border-radius: 10px; padding: 8px 12px; font-weight: bold; font-size: 12px; cursor: pointer;">Cashout</button>
-        </div>
+       
       </div>
     </div>
 
@@ -1050,7 +1048,7 @@ function listenToUserDoc(docId) {
     const userSnap = await getDoc(userRef);
     const balance = userSnap.data()?.balance ?? 0;
     if (balance < activeRoomSeed.stake) {
-      alert('Insufficient demo balance! Please top up your wallet.');
+      alert('Insufficient balance! Please top up your wallet.');
       openDepositModal();
       return;
     }
