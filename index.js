@@ -95,10 +95,10 @@ bot.action(/pay_telebirr_(.+)/, async (ctx) => {
 💳 የብር መጠን: ${amount} ETB
 
 🏦 የሂሳብ ቁጥር:
-0989464339
+0939383425
 
 👤 የሂሳብ ስም:
-Mikiyas Alemayehu Dersie
+Yemane Tsadik Gebreslassie
 
 1️⃣ በቴሌብር አማካኝነት ከላይ ወደለው የሂሳብ ቁጥር ትክክለኛውን ${amount} ETB ይላኩ።
 2️⃣ ከከፈሉ በኋላ ከነዚህ አንዱን ለዚህ ቦት ይላኩ:
@@ -123,10 +123,10 @@ bot.action(/pay_cbe_(.+)/, async (ctx) => {
 💳 የብር መጠን: ${amount} ETB
 
 🏦 የሂሳብ ቁጥር:
-0989464339
+0939383425
 
 👤 የሂሳብ ስም:
-MIKIYAS ALEMAYEHU
+Yemane Tsadik Gebreslassie
 
 1️⃣ በሲቢኤ ብር አማካኝነት ከላይ ወደለው የሂሳብ ቁጥር ትክክለኛውን ${amount} ETB ይላኩ።
 2️⃣ ከከፈሉ በኋላ ከነዚህ አንዱን ለዚህ ቦት ይላኩ:
