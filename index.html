@@ -678,58 +678,36 @@ const firebaseConfig = {
     setConnStatus(false, "Connecting to Firebase…");
     attemptSignIn();
 
-// Extract Telegram user info
+    // Extract Telegram user info
 const tg = window.Telegram?.WebApp;
 const tgUser = tg?.initDataUnsafe?.user;
-const telegramId = tgUser?.id; // Unique Telegram ID (e.g., 7309584664)
 
 onAuthStateChanged(auth, async (user) => {
   if (user) {
-    // Primary key: Telegram ID if available, otherwise fallback to Firebase UID
-    const docId = telegramId ? String(telegramId) : user.uid;
-
-    const displayName = tgUser
-      ? `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() || tgUser.username
-      : `Player-${docId.slice(0, 4)}`;
-
-    const userRef = doc(db, "users", docId);
+    uid = user.uid;
     
-    // Set up real-time listener so the UI updates instantly on balance changes
-    onSnapshot(userRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        // Update your UI element with the live database balance
-        document.getElementById("user-balance").innerText = `${data.balance.toFixed(2)} ETB`;
-      } else {
-        // Create initial user record if new
-        setDoc(userRef, {
-          telegramId: telegramId || null,
-          displayName: displayName,
-          balance: 0.00,
-          createdAt: new Date()
-        });
-      }
-    });
-  }
-});
-
+    // Fallback to Telegram profile name or default ID
+    const displayName = tgUser 
+      ? `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() || tgUser.username 
+      : `Player-${uid.slice(0,4)}`;
+      
     const telegramId = tgUser?.id ? String(tgUser.id) : null;
 const profilePic = tgUser?.photo_url || null;
 
-// Paste userDocId variable definition here:
+// Use telegramId if available, otherwise fallback to Firebase uid
 const userDocId = telegramId || uid;
 
 setConnStatus(true, `Connected • ${displayName}`);
 
-// Save to Firestore & initialize data feeds
+// Pass userDocId as the document key
 await ensureUserDoc(userDocId, {
   displayName,
   telegramId,
   profilePic
 });
+
 listenToUserDoc(userDocId);
-    listenToLeaderboard();
-    listenToRooms();
+
     
     // Update profile UI labels
     const profileNameEl = document.getElementById('profile-name');
@@ -828,22 +806,36 @@ listenToUserDoc(userDocId);
     });
   }
 }
+function listenToUserDoc(docId) {
+  if (userDocUnsub) userDocUnsub();
 
-  function listenToUserDoc(uid) {
-    if (userDocUnsub) userDocUnsub();
-    userDocUnsub = onSnapshot(doc(db, "users", uid), (snap) => {
-      if (!snap.exists()) return;
-      const d = snap.data();
-      updateBalanceDisplay(d.balance ?? 0);
-      document.getElementById('profile-name').innerText = d.displayName || "Player";
-      document.getElementById('stat-games').innerText = d.gamesPlayed ?? 0;
-      document.getElementById('stat-winnings').innerText = `${d.totalWinnings ?? 0} ETB`;
-      document.getElementById('stat-wins').innerText = `${d.wins ?? 0} 🏆`;
-      const rate = d.gamesPlayed ? Math.round(((d.wins ?? 0) / d.gamesPlayed) * 100) : 0;
-      document.getElementById('stat-winrate').innerText = `${rate}%`;
-      document.getElementById('profile-vip').innerText = `VIP ${Math.min(9, Math.floor((d.gamesPlayed ?? 0) / 20) + 1)}`;
-    });
-  }
+  userDocUnsub = onSnapshot(doc(db, "users", docId), (snap) => {
+    if (!snap.exists()) return;
+    const d = snap.data();
+
+    updateBalanceDisplay(d.balance ?? 0);
+
+    const profileName = document.getElementById('profile-name');
+    if (profileName) profileName.innerText = d.displayName || "Player";
+
+    const statGames = document.getElementById('stat-games');
+    if (statGames) statGames.innerText = d.gamesPlayed ?? 0;
+
+    const statWinnings = document.getElementById('stat-winnings');
+    if (statWinnings) statWinnings.innerText = `${d.totalWinnings ?? 0} ETB`;
+
+    const statWins = document.getElementById('stat-wins');
+    if (statWins) statWins.innerText = `${d.wins ?? 0} 🏆`;
+
+    const rate = d.gamesPlayed ? Math.round(((d.wins ?? 0) / d.gamesPlayed) * 100) : 0;
+    const statWinrate = document.getElementById('stat-winrate');
+    if (statWinrate) statWinrate.innerText = `${rate}%`;
+
+    const profileVip = document.getElementById('profile-vip');
+    if (profileVip) profileVip.innerText = `VIP ${Math.min(9, Math.floor((d.gamesPlayed ?? 0) / 20) + 1)}`;
+  });
+}
+
 
   function listenToLeaderboard() {
     const q = query(collection(db, "users"), orderBy("totalWinnings", "desc"), limit(10));
