@@ -793,7 +793,7 @@ listenToUserDoc(userDocId);
       displayName: tgData.displayName || `Player-${uid.slice(0,4)}`,
       telegramId: tgData.telegramId || null,
       photoUrl: tgData.profilePic || null,
-      balance: 250,
+      balance: 0,
       gamesPlayed: 0,
       totalWinnings: 0,
       wins: 0,
@@ -1213,10 +1213,18 @@ calledNumbers = [];
   };
 
   function updateBalanceDisplay(bal) {
-    document.getElementById('wallet-balance').innerText = bal;
-    document.getElementById('profile-balance').innerText = bal;
-  }
+  const formatted = `${Number(bal || 0).toFixed(2)} ETB`;
 
+  const walletBal = document.getElementById('wallet-balance');
+  if (walletBal) walletBal.innerText = formatted;
+
+  const profileBal = document.getElementById('profile-balance');
+  if (profileBal) profileBal.innerText = formatted;
+
+  // Add this to cover the top right badge in the header
+  const topBal = document.getElementById('top-balance');
+  if (topBal) topBal.innerText = formatted;
+}
   window.setLeaderboardTab = function(el) {
     document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
