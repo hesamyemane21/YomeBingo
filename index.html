@@ -1038,84 +1038,55 @@ onAuthStateChanged(auth, async (user) => {
     await addDoc(collection(db, "rooms", currentRoomId, "tickets"), {
       uid, ticketNum: selectedTicketNum, card: currentCard, joinedAt: serverTimestamp()
     });
-
-    const roomRef = doc(db, "rooms", currentRoomId);
-    await runTransaction(db, async (tx) => {
-      const snap = await tx.get(roomRef);
-      const data = snap.data() || {};
-      tx.update(roomRef, { playerCount: increment(1) });
-      if (!data.game || data.game.status !== "live") {
-        const sequence = shuffledSequence();
-        tx.update(roomRef, {
-          status: "live",
-          game: { calledSequence: sequence, startedAt: Date.now() }
-        });
-      }
-    });
-
-    document.getElementById('ticket-section').style.display = 'none';
-    document.getElementById('gameplay-section').style.display = 'block';
-    calledNumbers = [];
+calledNumbers = [];
     init100Matrix();
     renderBingoGrid('active-bingo-grid', true);
 
-    if (gameDocUnsub) gameDocUnsub();
-    gameDocUnsub = onSnapshot(roomRef, (snap) => {
-      const data = snap.data();
-      if (!data?.game?.calledSequence) return;
-      syncCalledNumbers(data.game.calledSequence, data.game.startedAt);
-    });
-
-    if (clockInterval) clearInterval(clockInterval);
-    clockInterval = setInterval(() => {
-      // triggers UI re-derivation between snapshots using local clock
-      if (roomStates[currentRoomId]?.game) {
-        syncCalledNumbers(roomStates[currentRoomId].game.calledSequence, roomStates[currentRoomId].game.startedAt);
-      }
-    }, 1000);
-  };
-
-  function shuffledSequence() {
-    const arr = Array.from({length: 75}, (_, i) => i + 1);
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
+    // Start live ball caller loop (1 ball every 2.4 seconds)
+    if (gameInterval) clearInterval(gameInterval);
+    gameInterval = setInterval(callNextBall, 2400);
   }
 
-  function syncCalledNumbers(sequence, startedAt) {
-    roomStates[currentRoomId] = roomStates[currentRoomId] || {};
-    roomStates[currentRoomId].game = { calledSequence: sequence, startedAt };
-    const elapsed = Date.now() - startedAt;
-    const count = Math.min(sequence.length, Math.max(0, Math.floor(elapsed / CALL_INTERVAL_MS) + 1));
-    const newCalled = sequence.slice(0, count);
-    if (newCalled.length === calledNumbers.length) return;
+  function callNextBall() {
+    if (calledNumbers.length >= 100) {
+      clearInterval(gameInterval);
+      return;
+    }
 
-    const latest = newCalled[newCalled.length - 1];
-    calledNumbers = newCalled;
-    document.getElementById('caller-ball').innerText = latest ?? '--';
-    document.getElementById('caller-status-text').innerText = count >= sequence.length ? 'ALL BALLS CALLED' : 'CALLING BALLS…';
+    let nextBall;
+    do {
+      nextBall = Math.floor(Math.random() * 100) + 1;
+    } while (calledNumbers.includes(nextBall));
+
+    calledNumbers.push(nextBall);
+    document.getElementById('caller-ball').innerText = nextBall;
     document.getElementById('called-count').innerText = calledNumbers.length;
 
-    document.querySelectorAll('.matrix-cell.latest').forEach(el => { el.classList.remove('latest'); el.classList.add('called'); });
-    calledNumbers.forEach(n => {
-      const cell = document.getElementById(`matrix-cell-${n}`);
-      if (cell) cell.classList.add('called');
-    });
-    const latestCell = document.getElementById(`matrix-cell-${latest}`);
-    if (latestCell) { latestCell.classList.remove('called'); latestCell.classList.add('latest'); }
+    // Update matrix
+    const matrixCell = document.getElementById(`matrix-cell-${nextBall}`);
+    if (matrixCell) {
+      document.querySelectorAll('.matrix-cell.latest').forEach(el => {
+        el.classList.remove('latest');
+        el.classList.add('called');
+      });
+      matrixCell.classList.add('latest');
+    }
 
-    let autoDaubOn = document.getElementById('autodaub-btn').innerText.includes('ON');
-    if (autoDaubOn) {
-      for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
-        if (calledNumbers.includes(currentCard[r][c].number)) currentCard[r][c].isMarked = true;
+    // Auto daub check
+    if (autoDaub) {
+      for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 5; c++) {
+          if (currentCard[r][c].number === nextBall) {
+            currentCard[r][c].isMarked = true;
+          }
+        }
       }
       renderBingoGrid('active-bingo-grid', true);
       checkForWin();
     }
   }
 
+  
   function handleCellClick(r, c) {
     const cell = currentCard[r][c];
     if (calledNumbers.includes(cell.number) || cell.isFree) {
@@ -1131,12 +1102,33 @@ onAuthStateChanged(auth, async (user) => {
     btn.innerText = `Auto-Daub: ${on ? 'OFF' : 'ON'}`;
   };
 
+  
   function checkForWin() {
     let winFound = false;
-    for (let r = 0; r < 5; r++) if (currentCard[r].every(c => c.isMarked)) { currentCard[r].forEach(c => c.isWinning = true); winFound = true; }
-    for (let c = 0; c < 5; c++) if ([0,1,2,3,4].every(r => currentCard[r][c].isMarked)) { [0,1,2,3,4].forEach(r => currentCard[r][c].isWinning = true); winFound = true; }
-    if ([0,1,2,3,4].every(i => currentCard[i][i].isMarked)) { [0,1,2,3,4].forEach(i => currentCard[i][i].isWinning = true); winFound = true; }
-    if ([0,1,2,3,4].every(i => currentCard[i][4-i].isMarked)) { [0,1,2,3,4].forEach(i => currentCard[i][4-i].isWinning = true); winFound = true; }
+
+    // Check rows
+    for (let r = 0; r < 5; r++) {
+      if (currentCard[r].every(c => c.isMarked)) {
+        currentCard[r].forEach(c => c.isWinning = true);
+        winFound = true;
+      }
+    }
+    // Check columns
+    for (let c = 0; c < 5; c++) {
+      if ([0,1,2,3,4].every(r => currentCard[r][c].isMarked)) {
+        [0,1,2,3,4].forEach(r => currentCard[r][c].isWinning = true);
+        winFound = true;
+      }
+    }
+    // Check diagonals
+    if ([0,1,2,3,4].every(i => currentCard[i][i].isMarked)) {
+      [0,1,2,3,4].forEach(i => currentCard[i][i].isWinning = true);
+      winFound = true;
+    }
+    if ([0,1,2,3,4].every(i => currentCard[i][4 - i].isMarked)) {
+      [0,1,2,3,4].forEach(i => currentCard[i][4 - i].isWinning = true);
+      winFound = true;
+    }
 
     if (winFound) {
       if (clockInterval) clearInterval(clockInterval);
