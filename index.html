@@ -678,18 +678,46 @@ const firebaseConfig = {
     setConnStatus(false, "Connecting to Firebase…");
     attemptSignIn();
 
-    onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        uid = user.uid;
-        setConnStatus(true, `Connected • ${uid.slice(0,6)}…`);
-        await ensureUserDoc(uid);
-        listenToUserDoc(uid);
-        listenToLeaderboard();
-        listenToRooms();
-        document.getElementById('profile-uid').innerText = `uid:${uid.slice(0,10)}… • Addis Ababa`;
-        document.getElementById('promo-code').innerText = `YEM-${uid.slice(0,4).toUpperCase()}-77`;
-      }
-    });
+    // Extract Telegram user info
+const tg = window.Telegram?.WebApp;
+const tgUser = tg?.initDataUnsafe?.user;
+
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    uid = user.uid;
+    
+    // Fallback to Telegram profile name or default ID
+    const displayName = tgUser 
+      ? `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() || tgUser.username 
+      : `Player-${uid.slice(0,4)}`;
+      
+    const telegramId = tgUser?.id ? String(tgUser.id) : null;
+    const profilePic = tgUser?.photo_url || null;
+
+    setConnStatus(true, `Connected • ${displayName}`);
+    
+    // Save to Firestore & initialize data feeds
+    await ensureUserDoc(uid, { displayName, telegramId, profilePic });
+    listenToUserDoc(uid);
+    listenToLeaderboard();
+    listenToRooms();
+    
+    // Update profile UI labels
+    const profileNameEl = document.getElementById('profile-name');
+    const profileUidEl = document.getElementById('profile-uid');
+    
+    if (profileNameEl) profileNameEl.innerText = displayName;
+    if (profileUidEl) {
+      profileUidEl.innerText = telegramId 
+        ? `Telegram ID: ${telegramId}` 
+        : `uid:${uid.slice(0,10)}… • Addis Ababa`;
+    }
+
+    const promoEl = document.getElementById('promo-code');
+    if (promoEl) promoEl.innerText = `YEM-${uid.slice(0,4).toUpperCase()}-77`;
+  }
+});
+
   } else {
     setConnStatus(false, "Firebase not configured — demo UI only");
   }
@@ -750,20 +778,27 @@ const firebaseConfig = {
     });
   }
 
-  async function ensureUserDoc(uid) {
-    const ref = doc(db, "users", uid);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) {
-      await setDoc(ref, {
-        displayName: `Player-${uid.slice(0,4)}`,
-        balance: 250,          // demo currency only
-        gamesPlayed: 0,
-        totalWinnings: 0,
-        wins: 0,
-        createdAt: serverTimestamp()
-      });
-    }
+  async function ensureUserDoc(uid, tgData = {}) {
+  const ref = doc(db, "users", uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    await setDoc(ref, {
+      displayName: tgData.displayName || `Player-${uid.slice(0,4)}`,
+      telegramId: tgData.telegramId || null,
+      photoUrl: tgData.profilePic || null,
+      balance: 250,
+      gamesPlayed: 0,
+      totalWinnings: 0,
+      wins: 0,
+      createdAt: serverTimestamp()
+    });
+  } else if (tgData.displayName) {
+    await updateDoc(ref, {
+      displayName: tgData.displayName,
+      photoUrl: tgData.profilePic || null
+    });
   }
+}
 
   function listenToUserDoc(uid) {
     if (userDocUnsub) userDocUnsub();
