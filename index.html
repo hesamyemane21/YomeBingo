@@ -1022,6 +1022,14 @@ onAuthStateChanged(auth, async (user) => {
          since startedAt. No single client needs to stay the host. ---- */
   const CALL_INTERVAL_MS = 2400;
   let clockInterval = null;
+  // FIX: this was previously used below (in startLiveGame / callNextBall /
+  // leaveGame / checkForWin) without ever being declared, which threw a
+  // ReferenceError the instant "Start Game" was tapped — silently aborting
+  // the function before it could switch views. Declaring it here fixes that.
+  let gameInterval = null;
+  // FIX: same issue — callNextBall() reads `autoDaub` but nothing ever
+  // declared or set it, so auto-marking/win-checking would throw too.
+  let autoDaub = true;
 
   window.startLiveGame = async function() {
     if (!isConfigured || !uid) { alert('Firebase not connected yet.'); return; }
@@ -1038,13 +1046,24 @@ onAuthStateChanged(auth, async (user) => {
     await addDoc(collection(db, "rooms", currentRoomId, "tickets"), {
       uid, ticketNum: selectedTicketNum, card: currentCard, joinedAt: serverTimestamp()
     });
-calledNumbers = [];
+
+    calledNumbers = [];
     init100Matrix();
     renderBingoGrid('active-bingo-grid', true);
 
+    // FIX: actually switch from the ticket-selection screen to the live
+    // gameplay screen — this was previously missing entirely, so even
+    // once the ReferenceError above is fixed, the game would still "run"
+    // invisibly behind the ticket-selection view.
+    document.getElementById('ticket-section').style.display = 'none';
+    document.getElementById('gameplay-section').style.display = 'block';
+    document.getElementById('caller-status-text').innerText = 'CALLING BALLS…';
+    document.getElementById('called-count').innerText = '0';
+    document.getElementById('caller-ball').innerText = '--';
+
     // Start live ball caller loop (1 ball every 2.4 seconds)
     if (gameInterval) clearInterval(gameInterval);
-    gameInterval = setInterval(callNextBall, 2400);
+    gameInterval = setInterval(callNextBall, CALL_INTERVAL_MS);
   }
 
   function callNextBall() {
@@ -1097,9 +1116,9 @@ calledNumbers = [];
   }
 
   window.toggleAutoDaub = function() {
+    autoDaub = !autoDaub;
     const btn = document.getElementById('autodaub-btn');
-    const on = btn.innerText.includes('ON');
-    btn.innerText = `Auto-Daub: ${on ? 'OFF' : 'ON'}`;
+    btn.innerText = `Auto-Daub: ${autoDaub ? 'ON' : 'OFF'}`;
   };
 
   
@@ -1131,7 +1150,10 @@ calledNumbers = [];
     }
 
     if (winFound) {
-      if (clockInterval) clearInterval(clockInterval);
+      // FIX: this was clearing clockInterval (which is never started
+      // anywhere) instead of gameInterval (the timer that's actually
+      // calling balls) — so the caller kept running after a win.
+      if (gameInterval) clearInterval(gameInterval);
       renderBingoGrid('active-bingo-grid', true);
       triggerWinCelebration();
     }
@@ -1157,7 +1179,9 @@ calledNumbers = [];
   };
 
   window.leaveGame = async function() {
-    if (clockInterval) clearInterval(clockInterval);
+    // FIX: was clearing clockInterval (never used) instead of the actual
+    // running gameInterval, so the ball caller kept firing after exiting.
+    if (gameInterval) clearInterval(gameInterval);
     if (gameDocUnsub) gameDocUnsub();
     if (currentRoomId) {
       try { await updateDoc(doc(db, "rooms", currentRoomId), { playerCount: increment(-1) }); } catch(e) {}
