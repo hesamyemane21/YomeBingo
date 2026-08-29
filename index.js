@@ -13,14 +13,18 @@ http.createServer((req, res) => {
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
-// In-memory stores
+// Global state and balance stores
 const userDeposits = {};
 const userState = {}; 
-const userBalances = {}; // Stores user balances
+const userBalances = {}; 
+
+// Helper to consistently get user ID string
+const getUserId = (ctx) => String(ctx.from.id);
 
 // --- DEPOSIT TRIGGER ---
 const startDepositFlow = async (ctx) => {
-  userState[ctx.from.id] = 'AWAITING_AMOUNT';
+  const userId = getUserId(ctx);
+  userState[userId] = 'AWAITING_AMOUNT';
   await ctx.reply("Please enter the amount you want to deposit (50–3000 ETB):");
 };
 
@@ -64,20 +68,21 @@ bot.on('text', async (ctx, next) => {
   const text = ctx.message.text.trim();
   if (text.startsWith('/')) return next();
 
-  const userId = ctx.from.id;
+  const userId = getUserId(ctx);
   const state = userState[userId];
 
-  // Check for receipt link or code
+  // Check if user is submitting receipt/link
   const isReceipt = state === 'AWAITING_RECEIPT' || 
                     text.includes('transactioninfo.ethiotelecom.et') || 
                     (text.length > 8 && isNaN(text));
 
   if (isReceipt) {
     delete userState[userId];
+    
+    // Convert deposit to float and add to current balance
     const depositAmount = parseFloat(userDeposits[userId] || '50.0');
-
-    // Update user balance
-    userBalances[userId] = (userBalances[userId] || 0) + depositAmount;
+    const currentBal = userBalances[userId] || 0;
+    userBalances[userId] = currentBal + depositAmount;
 
     await ctx.reply("⌛ Please wait...");
     return ctx.reply(`✅ Your deposit of ${depositAmount.toFixed(1)} ETB via TeleBirr has been received and credited to your account. Thank you!`);
@@ -105,7 +110,7 @@ bot.on('text', async (ctx, next) => {
 // --- WALLET SELECTION HANDLERS ---
 bot.action(/pay_telebirr_(.+)/, async (ctx) => {
   await ctx.answerCbQuery();
-  const userId = ctx.match[1];
+  const userId = getUserId(ctx);
   const amount = userDeposits[userId] || '50.0';
 
   userState[userId] = 'AWAITING_RECEIPT';
@@ -135,7 +140,7 @@ Yemane Tsadik Gebreslassie
 
 bot.action(/pay_cbe_(.+)/, async (ctx) => {
   await ctx.answerCbQuery();
-  const userId = ctx.match[1];
+  const userId = getUserId(ctx);
   const amount = userDeposits[userId] || '50.0';
 
   userState[userId] = 'AWAITING_RECEIPT';
@@ -163,12 +168,12 @@ Yemane Tsadik Gebreslassie
   await ctx.reply(msg);
 });
 
-// --- OTHER BUTTON HANDLERS ---
+// --- BALANCE HANDLER ---
 bot.action('balance', async (ctx) => {
   await ctx.answerCbQuery();
-  const userId = ctx.from.id;
-  const currentBalance = (userBalances[userId] || 0).toFixed(2);
-  await ctx.reply(`Your balance: ${currentBalance} ETB`);
+  const userId = getUserId(ctx);
+  const currentBalance = userBalances[userId] || 0;
+  await ctx.reply(`Your balance: ${currentBalance.toFixed(2)} ETB`);
 });
 
 bot.action('instructions', async (ctx) => {
