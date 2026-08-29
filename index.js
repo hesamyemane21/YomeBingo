@@ -29,7 +29,7 @@ bot.command('start', async (ctx) => {
   const photoUrl = 'https://i.imgur.com/58zJ61A.jpeg';
 
   const keyboard = Markup.inlineKeyboard([
-    [Markup.button.webApp('🎮 Play now 🎮', 'https://hesamyemane21.github.io/YemeBingo/')],
+    [Markup.button.webApp('🎮 Play now 🎮', 'https://hesamyemane21.github.io/YomeBingo/')],
     [
       Markup.button.callback('Check Balance 💰', 'balance'),
       Markup.button.callback('Game Instruction 📑', 'instructions')
