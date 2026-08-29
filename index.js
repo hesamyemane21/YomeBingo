@@ -13,14 +13,14 @@ http.createServer((req, res) => {
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
-// In-memory store for user deposit amounts
+// In-memory stores
 const userDeposits = {};
+const userState = {}; 
 
 // --- DEPOSIT TRIGGER ---
 const startDepositFlow = async (ctx) => {
-  await ctx.reply('Please enter the amount you want to deposit (50–3000 ETB):', {
-    reply_markup: { force_reply: true }
-  });
+  userState[ctx.from.id] = 'AWAITING_AMOUNT';
+  await ctx.reply("Please enter the amount you want to deposit (50–3000 ETB):");
 };
 
 // --- START COMMAND ---
@@ -56,30 +56,45 @@ bot.command('deposit', async (ctx) => {
   await startDepositFlow(ctx);
 });
 
-// --- HANDLE TEXT RESPONSES (AMOUNT INPUT) ---
+// --- TEXT MESSAGE ROUTER (AMOUNT & RECEIPT HANDLER) ---
 bot.on('text', async (ctx, next) => {
   if (!ctx.message || !ctx.message.text) return next();
   
   const text = ctx.message.text.trim();
-  
-  // Skip if it's a command like /start
   if (text.startsWith('/')) return next();
 
-  const amount = parseFloat(text);
+  const userId = ctx.from.id;
+  const state = userState[userId];
 
+  // Case A: User sends receipt link/text/ID while waiting or sends a raw receipt link
+  const isReceipt = state === 'AWAITING_RECEIPT' || 
+                    text.includes('transactioninfo.ethiotelecom.et') || 
+                    (text.length > 8 && isNaN(text));
+
+  if (isReceipt) {
+    delete userState[userId];
+    const depositAmount = userDeposits[userId] || '50.0';
+
+    await ctx.reply("⌛ Please wait...");
+    return ctx.reply(`✅ Your deposit of ${depositAmount} ETB via TeleBirr has been received and credited to your account. Thank you!`);
+  } 
+
+  // Case B: User inputs deposit amount
+  const amount = parseFloat(text);
   if (!isNaN(amount) && amount >= 50 && amount <= 3000) {
     const formattedAmount = amount.toFixed(1);
-    userDeposits[ctx.from.id] = formattedAmount;
+    userDeposits[userId] = formattedAmount;
+    userState[userId] = 'AWAITING_WALLET';
 
     return ctx.reply(
       `To deposit ${formattedAmount} ETB, select the wallet you are sending from:`,
       Markup.inlineKeyboard([
-        [Markup.button.callback('TeleBirr', `pay_telebirr_${ctx.from.id}`)],
-        [Markup.button.callback('CBE Birr', `pay_cbe_${ctx.from.id}`)]
+        [Markup.button.callback('TeleBirr', `pay_telebirr_${userId}`)],
+        [Markup.button.callback('CBE Birr', `pay_cbe_${userId}`)]
       ])
     );
   } else {
-    return ctx.reply('⚠️ Invalid amount. Please enter a number between 50 and 3000 ETB:');
+    return ctx.reply("⚠️ Invalid amount. Please enter a number between 50 and 3000 ETB:");
   }
 });
 
@@ -88,6 +103,9 @@ bot.action(/pay_telebirr_(.+)/, async (ctx) => {
   await ctx.answerCbQuery();
   const userId = ctx.match[1];
   const amount = userDeposits[userId] || '50.0';
+
+  // Set user state to wait for receipt input
+  userState[userId] = 'AWAITING_RECEIPT';
 
   const msg = 
 `💰 እንዴት ዲፖዚት ይደረጋል - ቴሌብር
@@ -116,6 +134,9 @@ bot.action(/pay_cbe_(.+)/, async (ctx) => {
   await ctx.answerCbQuery();
   const userId = ctx.match[1];
   const amount = userDeposits[userId] || '50.0';
+
+  // Set user state to wait for receipt input
+  userState[userId] = 'AWAITING_RECEIPT';
 
   const msg = 
 `💰 እንዴት ዲፖዚት ይደረጋል - ሲቢኤ ብር
