@@ -2,6 +2,7 @@ const { Telegraf, Markup } = require('telegraf');
 const http = require('http');
 
 const PORT = process.env.PORT || 3000;
+const ADMIN_CHAT_ID = "7309584664"; // Your admin Telegram User ID
 
 // Keep-alive HTTP server for Render
 http.createServer((req, res) => {
@@ -13,12 +14,11 @@ http.createServer((req, res) => {
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
-// Global state and balance stores
+// Global stores
 const userDeposits = {};
 const userState = {}; 
 const userBalances = {}; 
 
-// Helper to consistently get user ID string
 const getUserId = (ctx) => String(ctx.from.id);
 
 // --- DEPOSIT TRIGGER ---
@@ -61,7 +61,7 @@ bot.command('deposit', async (ctx) => {
   await startDepositFlow(ctx);
 });
 
-// --- TEXT MESSAGE ROUTER (AMOUNT & RECEIPT HANDLER) ---
+// --- TEXT MESSAGE ROUTER ---
 bot.on('text', async (ctx, next) => {
   if (!ctx.message || !ctx.message.text) return next();
   
@@ -71,21 +71,29 @@ bot.on('text', async (ctx, next) => {
   const userId = getUserId(ctx);
   const state = userState[userId];
 
-  // Check if user is submitting receipt/link
+  // Send receipt info to Admin for manual review
   const isReceipt = state === 'AWAITING_RECEIPT' || 
                     text.includes('transactioninfo.ethiotelecom.et') || 
                     (text.length > 8 && isNaN(text));
 
   if (isReceipt) {
     delete userState[userId];
-    
-    // Convert deposit to float and add to current balance
-    const depositAmount = parseFloat(userDeposits[userId] || '50.0');
-    const currentBal = userBalances[userId] || 0;
-    userBalances[userId] = currentBal + depositAmount;
+    const depositAmount = userDeposits[userId] || '50.0';
 
-    await ctx.reply("⌛ Please wait...");
-    return ctx.reply(`✅ Your deposit of ${depositAmount.toFixed(1)} ETB via TeleBirr has been received and credited to your account. Thank you!`);
+    await ctx.reply("⌛ Receipt submitted! Your deposit is currently pending admin verification...");
+
+    // Send receipt notification to Admin
+    await ctx.telegram.sendMessage(
+      ADMIN_CHAT_ID,
+      `📥 **New Deposit Request**\nUser ID: \`${userId}\`\nAmount: ${depositAmount} ETB\nReceipt: ${text}`,
+      Markup.inlineKeyboard([
+        [
+          Markup.button.callback('Approve ✅', `approve_${userId}_${depositAmount}`),
+          Markup.button.callback('Reject ❌', `reject_${userId}`)
+        ]
+      ])
+    );
+    return;
   } 
 
   // Process deposit amount input
@@ -105,6 +113,39 @@ bot.on('text', async (ctx, next) => {
   } else {
     return ctx.reply("⚠️ Invalid amount. Please enter a number between 50 and 3000 ETB:");
   }
+});
+
+// --- ADMIN APPROVAL/REJECTION HANDLERS ---
+bot.action(/approve_(.+)_(.+)/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const targetUserId = ctx.match[1];
+  const amount = parseFloat(ctx.match[2]);
+
+  // Update user balance
+  userBalances[targetUserId] = (userBalances[targetUserId] || 0) + amount;
+
+  // Edit admin message
+  await ctx.editMessageText(`✅ Approved ${amount} ETB for User ID: ${targetUserId}`);
+
+  // Notify user
+  await ctx.telegram.sendMessage(
+    targetUserId,
+    `✅ Your deposit of ${amount.toFixed(1)} ETB has been verified and credited to your account. Thank you!`
+  );
+});
+
+bot.action(/reject_(.+)/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const targetUserId = ctx.match[1];
+
+  // Edit admin message
+  await ctx.editMessageText(`❌ Rejected deposit for User ID: ${targetUserId}`);
+
+  // Notify user
+  await ctx.telegram.sendMessage(
+    targetUserId,
+    `❌ Transaction verification failed: Payment receipt was not accepted or recipient details did not match.`
+  );
 });
 
 // --- WALLET SELECTION HANDLERS ---
@@ -168,7 +209,7 @@ Yemane Tsadik Gebreslassie
   await ctx.reply(msg);
 });
 
-// --- BALANCE HANDLER ---
+// --- BALANCE & SUPPORT ---
 bot.action('balance', async (ctx) => {
   await ctx.answerCbQuery();
   const userId = getUserId(ctx);
