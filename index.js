@@ -1,8 +1,17 @@
 const { Telegraf, Markup } = require('telegraf');
 const http = require('http');
+const admin = require('firebase-admin');
 
+// Initialize Firebase Admin SDK using your uploaded key
+const serviceAccount = require('./serviceAccountKey.json');
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+const db = admin.firestore();
 const PORT = process.env.PORT || 3000;
-const ADMIN_CHAT_ID = "7309584664"; // Your admin Telegram User ID
+const ADMIN_CHAT_ID = "7309584664";
 
 // Keep-alive HTTP server for Render
 http.createServer((req, res) => {
@@ -14,12 +23,22 @@ http.createServer((req, res) => {
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
-// Global stores
+// Temporary state stores
 const userDeposits = {};
 const userState = {}; 
-const userBalances = {}; 
 
 const getUserId = (ctx) => String(ctx.from.id);
+
+// Helper function to get or create a user in Firebase
+async function getOrCreateUser(userId) {
+  const userRef = db.collection('users').doc(userId);
+  const doc = await userRef.get();
+  if (!doc.exists) {
+    await userRef.set({ balance: 0.0, createdAt: new Date() });
+    return 0.0;
+  }
+  return doc.data().balance || 0.0;
+}
 
 // --- DEPOSIT TRIGGER ---
 const startDepositFlow = async (ctx) => {
@@ -30,6 +49,9 @@ const startDepositFlow = async (ctx) => {
 
 // --- START COMMAND ---
 bot.command('start', async (ctx) => {
+  const userId = getUserId(ctx);
+  await getOrCreateUser(userId);
+
   const textMsg = 'Welcome to Yeme Bingo! Play bingo and start winning today!';
   const photoUrl = 'https://i.imgur.com/58zJ61A.jpeg';
 
@@ -115,22 +137,29 @@ bot.on('text', async (ctx, next) => {
   }
 });
 
-// --- ADMIN APPROVAL/REJECTION HANDLERS ---
+// --- ADMIN APPROVAL HANDLER (UPDATES FIREBASE) ---
 bot.action(/approve_(.+)_(.+)/, async (ctx) => {
   await ctx.answerCbQuery();
   const targetUserId = ctx.match[1];
   const amount = parseFloat(ctx.match[2]);
 
-  // Update user balance
-  userBalances[targetUserId] = (userBalances[targetUserId] || 0) + amount;
+  const userRef = db.collection('users').doc(targetUserId);
+
+  // Increment user balance directly in Firestore
+  await userRef.set({
+    balance: admin.firestore.FieldValue.increment(amount)
+  }, { merge: true });
+
+  const updatedDoc = await userRef.get();
+  const newBalance = updatedDoc.data().balance;
 
   // Edit admin message
-  await ctx.editMessageText(`✅ Approved ${amount} ETB for User ID: ${targetUserId}`);
+  await ctx.editMessageText(`✅ Approved ${amount} ETB for User ID: ${targetUserId}. New Balance: ${newBalance.toFixed(2)} ETB`);
 
   // Notify user
   await ctx.telegram.sendMessage(
     targetUserId,
-    `✅ Your deposit of ${amount.toFixed(1)} ETB has been verified and credited to your account. Thank you!`
+    `✅ Your deposit of ${amount.toFixed(1)} ETB has been verified and credited! Current Balance: ${newBalance.toFixed(2)} ETB`
   );
 });
 
@@ -213,7 +242,7 @@ Yemane Tsadik Gebreslassie
 bot.action('balance', async (ctx) => {
   await ctx.answerCbQuery();
   const userId = getUserId(ctx);
-  const currentBalance = userBalances[userId] || 0;
+  const currentBalance = await getOrCreateUser(userId);
   await ctx.reply(`Your balance: ${currentBalance.toFixed(2)} ETB`);
 });
 
