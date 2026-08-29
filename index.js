@@ -16,6 +16,7 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 // In-memory stores
 const userDeposits = {};
 const userState = {}; 
+const userBalances = {}; // Stores user balances
 
 // --- DEPOSIT TRIGGER ---
 const startDepositFlow = async (ctx) => {
@@ -66,20 +67,23 @@ bot.on('text', async (ctx, next) => {
   const userId = ctx.from.id;
   const state = userState[userId];
 
-  // Case A: User sends receipt link/text/ID while waiting or sends a raw receipt link
+  // Check for receipt link or code
   const isReceipt = state === 'AWAITING_RECEIPT' || 
                     text.includes('transactioninfo.ethiotelecom.et') || 
                     (text.length > 8 && isNaN(text));
 
   if (isReceipt) {
     delete userState[userId];
-    const depositAmount = userDeposits[userId] || '50.0';
+    const depositAmount = parseFloat(userDeposits[userId] || '50.0');
+
+    // Update user balance
+    userBalances[userId] = (userBalances[userId] || 0) + depositAmount;
 
     await ctx.reply("⌛ Please wait...");
-    return ctx.reply(`✅ Your deposit of ${depositAmount} ETB via TeleBirr has been received and credited to your account. Thank you!`);
+    return ctx.reply(`✅ Your deposit of ${depositAmount.toFixed(1)} ETB via TeleBirr has been received and credited to your account. Thank you!`);
   } 
 
-  // Case B: User inputs deposit amount
+  // Process deposit amount input
   const amount = parseFloat(text);
   if (!isNaN(amount) && amount >= 50 && amount <= 3000) {
     const formattedAmount = amount.toFixed(1);
@@ -104,7 +108,6 @@ bot.action(/pay_telebirr_(.+)/, async (ctx) => {
   const userId = ctx.match[1];
   const amount = userDeposits[userId] || '50.0';
 
-  // Set user state to wait for receipt input
   userState[userId] = 'AWAITING_RECEIPT';
 
   const msg = 
@@ -135,7 +138,6 @@ bot.action(/pay_cbe_(.+)/, async (ctx) => {
   const userId = ctx.match[1];
   const amount = userDeposits[userId] || '50.0';
 
-  // Set user state to wait for receipt input
   userState[userId] = 'AWAITING_RECEIPT';
 
   const msg = 
@@ -164,7 +166,9 @@ Yemane Tsadik Gebreslassie
 // --- OTHER BUTTON HANDLERS ---
 bot.action('balance', async (ctx) => {
   await ctx.answerCbQuery();
-  await ctx.reply('Your balance: 0.00 ETB');
+  const userId = ctx.from.id;
+  const currentBalance = (userBalances[userId] || 0).toFixed(2);
+  await ctx.reply(`Your balance: ${currentBalance} ETB`);
 });
 
 bot.action('instructions', async (ctx) => {
